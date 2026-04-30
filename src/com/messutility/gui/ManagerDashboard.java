@@ -204,12 +204,31 @@ public class ManagerDashboard extends JPanel {
         JTextField amountField = new JTextField(5);
         JTextField descField = new JTextField(10);
         
-        java.util.List<Resident> residents = UserDAO.getAllResidents();
         JComboBox<String> residentBox = new JComboBox<>();
         residentBox.addItem("None (Manager Paid)");
-        for (Resident r : residents) {
+        for (Resident r : UserDAO.getAllResidents()) {
             residentBox.addItem(r.getId() + " - " + r.getName());
         }
+
+        // Dynamically refresh the dropdown list when clicked
+        residentBox.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) {
+                Object selected = residentBox.getSelectedItem();
+                residentBox.removeAllItems();
+                residentBox.addItem("None (Manager Paid)");
+                for (Resident r : UserDAO.getAllResidents()) {
+                    residentBox.addItem(r.getId() + " - " + r.getName());
+                }
+                if (selected != null) {
+                    residentBox.setSelectedItem(selected);
+                }
+            }
+            @Override
+            public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) {}
+            @Override
+            public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) {}
+        });
 
         formPanel.add(new JLabel("Type:"));
         formPanel.add(typeBox);
@@ -242,12 +261,7 @@ public class ManagerDashboard extends JPanel {
                 if (residentBox.getSelectedIndex() > 0) {
                     String selected = (String) residentBox.getSelectedItem();
                     String resId = selected.split(" - ")[0];
-                    for (Resident r : residents) {
-                        if (r.getId().equals(resId)) {
-                            paidBy = r;
-                            break;
-                        }
-                    }
+                    paidBy = UserDAO.getResidentById(resId);
                 }
 
                 com.messutility.models.expenses.Expense exp;

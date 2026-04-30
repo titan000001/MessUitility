@@ -61,8 +61,33 @@ public class MessSelectionScreen extends JPanel {
             if (name != null && !name.trim().isEmpty()) {
                 // Ensure valid filename (alphanumeric and underscores)
                 name = name.replaceAll("[^a-zA-Z0-9_-]", "_");
-                DatabaseManager.setDatabase(name);
-                proceedToLogin();
+                
+                JTextField adminNameField = new JTextField();
+                JPasswordField adminPassField = new JPasswordField();
+                Object[] message = {
+                    "Admin Name (Your Name):", adminNameField,
+                    "Admin Password:", adminPassField
+                };
+                
+                int option = JOptionPane.showConfirmDialog(this, message, "Setup Administrator Account", JOptionPane.OK_CANCEL_OPTION);
+                if (option == JOptionPane.OK_OPTION) {
+                    DatabaseManager.setDatabase(name);
+                    DatabaseManager.initializeDatabase(); // Create tables immediately
+                    
+                    String adminName = adminNameField.getText().trim();
+                    String adminPass = new String(adminPassField.getPassword());
+                    if (adminName.isEmpty()) adminName = "System Manager";
+                    if (adminPass.isEmpty()) adminPass = "admin123";
+                    
+                    com.messutility.models.users.Manager manager = new com.messutility.models.users.Manager("admin", adminName, "N/A", adminPass);
+                    UserDAO.addUser(manager, "MANAGER");
+                    
+                    // Automatically add the Admin as a Resident for meal tracking
+                    com.messutility.models.users.Resident adminRes = new com.messutility.models.users.Resident("R_admin", adminName + " (Admin)", "N/A", adminPass);
+                    UserDAO.addUser(adminRes, "RESIDENT");
+                    
+                    proceedToLogin();
+                }
             }
         });
 
