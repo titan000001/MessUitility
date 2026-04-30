@@ -15,4 +15,7 @@ Write-Host "Downloading SLF4J API (required by new SQLite JDBC)..."
 Invoke-WebRequest -Uri "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar" -OutFile "$libDir/slf4j-api.jar"
 Invoke-WebRequest -Uri "https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/1.7.36/slf4j-simple-1.7.36.jar" -OutFile "$libDir/slf4j-simple.jar"
 
+Write-Host "Downloading OpenPDF (for PDF export)..."
+Invoke-WebRequest -Uri "https://repo1.maven.org/maven2/com/github/librepdf/openpdf/1.3.30/openpdf-1.3.30.jar" -OutFile "$libDir/openpdf.jar"
+
 Write-Host "All libraries downloaded successfully to /lib folder!"

@@ -209,19 +209,32 @@ public class ManagerDashboard extends JPanel {
         });
 
         // Bottom panel for generating bills
-        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
         JButton generateBtn = new JButton("Generate Month-End Bills");
         generateBtn.setFont(new Font("Segoe UI", Font.BOLD, 16));
         generateBtn.setBackground(new Color(41, 128, 185));
         generateBtn.setForeground(Color.WHITE);
         bottomPanel.add(generateBtn);
 
+        JButton exportBtn = new JButton("Export to PDF");
+        exportBtn.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        exportBtn.setBackground(new Color(155, 89, 182));
+        exportBtn.setForeground(Color.WHITE);
+        exportBtn.setEnabled(false);
+        bottomPanel.add(exportBtn);
+
+        java.util.List<com.messutility.core.MonthlyBill> currentBills = new java.util.ArrayList<>();
+
         generateBtn.addActionListener(e -> {
-            java.util.List<com.messutility.models.expenses.Expense> allExp = com.messutility.db.ExpenseDAO.getAllExpenses();
-            java.util.List<com.messutility.models.tracker.MealLog> allLogs = com.messutility.db.MealDAO.getAllMealLogs();
-            java.util.List<Resident> allRes = UserDAO.getAllResidents();
+            java.util.List<com.messutility.core.MonthlyBill> bills = com.messutility.core.SettlementEngine.generateMonthlyBills(
+                com.messutility.db.ExpenseDAO.getAllExpenses(), 
+                com.messutility.db.MealDAO.getAllMealLogs(), 
+                UserDAO.getAllResidents()
+            );
             
-            java.util.List<com.messutility.core.MonthlyBill> bills = com.messutility.core.SettlementEngine.generateMonthlyBills(allExp, allLogs, allRes);
+            currentBills.clear();
+            currentBills.addAll(bills);
+            exportBtn.setEnabled(true);
             
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("%-25s | %-15s\n", "Resident Name", "Amount to Pay"));
@@ -230,11 +243,6 @@ public class ManagerDashboard extends JPanel {
                 if (b.getAmountDue() > 0) {
                     sb.append(String.format("%-25s | $%-14.2f\n", b.getResident().getName(), b.getAmountDue()));
                 } else {
-                    // They have a negative amountDue (or exactly 0), meaning they are owed money or neutral
-                    // In our current SettlementEngine logic, we map negative net balance to positive amountDue
-                    // Wait, getNetBalance() = totalPaid - totalOwed
-                    // If netBalance > 0, they overpaid and are owed money.
-                    // Let's re-verify: amountDue = netBalance < 0 ? Math.abs(netBalance) : 0.0;
                     if (b.getResident().getNetBalance() > 0) {
                         sb.append(String.format("%-25s | Owed to them: $%.2f\n", b.getResident().getName(), b.getResident().getNetBalance()));
                     } else {
@@ -244,6 +252,17 @@ public class ManagerDashboard extends JPanel {
             }
             billsArea.setText(sb.toString());
             JOptionPane.showMessageDialog(this, "Bills Generated successfully!");
+        });
+
+        exportBtn.addActionListener(e -> {
+            try {
+                String fileName = "Bills_Report_" + System.currentTimeMillis() + ".pdf";
+                com.messutility.core.PDFGenerator.generateMonthlyBillsPDF(currentBills, fileName);
+                JOptionPane.showMessageDialog(this, "Successfully Exported! Check folder for: " + fileName);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Failed to export PDF: " + ex.getMessage());
+            }
         });
 
         panel.add(formPanel, BorderLayout.NORTH);
