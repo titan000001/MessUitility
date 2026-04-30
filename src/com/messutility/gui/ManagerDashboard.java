@@ -309,9 +309,10 @@ public class ManagerDashboard extends JPanel {
 
         exportBtn.addActionListener(e -> {
             try {
-                String fileName = "Bills_Report_" + System.currentTimeMillis() + ".pdf";
+                String folder = com.messutility.core.DatabaseManager.getAppDataFolder();
+                String fileName = folder + "/Bills_Report_" + System.currentTimeMillis() + ".pdf";
                 com.messutility.core.PDFGenerator.generateMonthlyBillsPDF(currentBills, fileName);
-                JOptionPane.showMessageDialog(this, "Successfully Exported! Check folder for: " + fileName);
+                JOptionPane.showMessageDialog(this, "Successfully Exported! Check folder:\n" + folder);
             } catch (Exception ex) {
                 ex.printStackTrace();
                 JOptionPane.showMessageDialog(this, "Failed to export PDF: " + ex.getMessage());

@@ -5,10 +5,19 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 
 public class DatabaseManager {
-    private static String currentDbUrl = "jdbc:sqlite:default_mess.db";
+    public static String getAppDataFolder() {
+        String path = System.getProperty("user.home") + "/MessUtilityData";
+        java.io.File dir = new java.io.File(path);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        return path;
+    }
+
+    private static String currentDbUrl = "jdbc:sqlite:" + getAppDataFolder() + "/default_mess.db";
 
     public static void setDatabase(String dbName) {
-        currentDbUrl = "jdbc:sqlite:" + dbName + ".db";
+        currentDbUrl = "jdbc:sqlite:" + getAppDataFolder() + "/" + dbName + ".db";
     }
 
     public static Connection getConnection() throws Exception {

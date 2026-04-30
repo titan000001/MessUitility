@@ -23,9 +23,9 @@ public class MessSelectionScreen extends JPanel {
         title.setFont(new Font("Segoe UI", Font.BOLD, 22));
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
         
-        // Scan for .db files in current directory
+        // Scan for .db files in user data directory
         java.util.List<String> dbFiles = new ArrayList<>();
-        File currentDir = new File(".");
+        File currentDir = new File(DatabaseManager.getAppDataFolder());
         File[] files = currentDir.listFiles((dir, name) -> name.endsWith(".db"));
         if (files != null) {
             for (File f : files) {
