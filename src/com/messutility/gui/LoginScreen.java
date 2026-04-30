@@ -22,9 +22,18 @@ public class LoginScreen extends JPanel {
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
         titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
-        JTextField idField = new JTextField();
-        idField.setBorder(BorderFactory.createTitledBorder("User ID"));
-        idField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        class UserItem {
+            User user;
+            UserItem(User u) { this.user = u; }
+            public String toString() { return user.getName() + " (" + user.getClass().getSimpleName() + ")"; }
+        }
+
+        JComboBox<UserItem> userBox = new JComboBox<>();
+        for (User u : UserDAO.getAllUsers()) {
+            userBox.addItem(new UserItem(u));
+        }
+        userBox.setBorder(BorderFactory.createTitledBorder("Select User"));
+        userBox.setFont(new Font("Segoe UI", Font.PLAIN, 16));
 
         JPasswordField passField = new JPasswordField();
         passField.setBorder(BorderFactory.createTitledBorder("Password"));
@@ -37,12 +46,27 @@ public class LoginScreen extends JPanel {
         loginBtn.setFocusPainted(false);
         loginBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
+        // Add hover animation effect
+        loginBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                loginBtn.setBackground(new Color(52, 152, 219));
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                loginBtn.setBackground(new Color(41, 128, 185));
+            }
+        });
+
         loginBtn.addActionListener(e -> {
-            String id = idField.getText().trim();
+            UserItem selectedItem = (UserItem) userBox.getSelectedItem();
+            if (selectedItem == null) {
+                JOptionPane.showMessageDialog(this, "No user selected.", "Warning", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            String id = selectedItem.user.getId();
             String pass = new String(passField.getPassword());
 
-            if (id.isEmpty() || pass.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Please enter both ID and Password.", "Warning", JOptionPane.WARNING_MESSAGE);
+            if (pass.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter your Password.", "Warning", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
@@ -60,12 +84,12 @@ public class LoginScreen extends JPanel {
                 parentFrame.repaint();
 
             } else {
-                JOptionPane.showMessageDialog(this, "Invalid User ID or Password.", "Login Failed", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Invalid Password.", "Login Failed", JOptionPane.ERROR_MESSAGE);
             }
         });
 
         formPanel.add(titleLabel);
-        formPanel.add(idField);
+        formPanel.add(userBox);
         formPanel.add(passField);
         formPanel.add(loginBtn);
 

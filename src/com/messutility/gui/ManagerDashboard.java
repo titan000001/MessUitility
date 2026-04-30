@@ -178,17 +178,38 @@ public class ManagerDashboard extends JPanel {
         DefaultListModel<String> daysModel = new DefaultListModel<>();
         java.time.LocalDate today = java.time.LocalDate.now();
         java.time.YearMonth yearMonth = java.time.YearMonth.from(today);
-        for (int i = 1; i <= yearMonth.lengthOfMonth(); i++) {
-            daysModel.addElement(yearMonth.atDay(i).toString());
-        }
-        
         JList<String> daysList = new JList<>(daysModel);
+
+        Runnable loadDates = () -> {
+            int selected = daysList.getSelectedIndex();
+            daysModel.clear();
+            java.util.Map<String, Integer> mealTotals = com.messutility.db.MealDAO.getDailyMealTotals();
+            for (int i = 1; i <= yearMonth.lengthOfMonth(); i++) {
+                String dateStr = yearMonth.atDay(i).toString();
+                int total = mealTotals.getOrDefault(dateStr, 0);
+                if (total > 0) {
+                    daysModel.addElement(dateStr + "   (" + total + " meals) ★");
+                } else {
+                    daysModel.addElement(dateStr);
+                }
+            }
+            if (selected >= 0 && selected < daysModel.getSize()) {
+                daysList.setSelectedIndex(selected);
+            } else if (daysModel.getSize() > 0) {
+                int dayIndex = today.getDayOfMonth() - 1;
+                if (dayIndex >= 0 && dayIndex < daysModel.getSize()) {
+                    daysList.setSelectedIndex(dayIndex);
+                }
+            }
+        };
+
+        loadDates.run();
+
         daysList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         daysList.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        daysList.setSelectedIndex(today.getDayOfMonth() - 1); // select today
         
         JScrollPane leftScroll = new JScrollPane(daysList);
-        leftScroll.setPreferredSize(new Dimension(150, 0));
+        leftScroll.setPreferredSize(new Dimension(200, 0));
         leftScroll.setBorder(BorderFactory.createTitledBorder("Days of Month"));
         
         panel.add(leftScroll, BorderLayout.WEST);
@@ -221,8 +242,9 @@ public class ManagerDashboard extends JPanel {
         rightPanel.add(tableScroll, BorderLayout.CENTER);
 
         Runnable loadTableForDate = () -> {
-            String selectedDate = daysList.getSelectedValue();
-            if (selectedDate == null) return;
+            String selectedDisplay = daysList.getSelectedValue();
+            if (selectedDisplay == null) return;
+            String selectedDate = selectedDisplay.substring(0, 10);
             dateLabel.setText("Editing Meals for: " + selectedDate);
             tableModel.setRowCount(0); // clear
             
@@ -257,8 +279,9 @@ public class ManagerDashboard extends JPanel {
             if (table.isEditing()) {
                 table.getCellEditor().stopCellEditing();
             }
-            String selectedDate = daysList.getSelectedValue();
-            if (selectedDate == null) return;
+            String selectedDisplay = daysList.getSelectedValue();
+            if (selectedDisplay == null) return;
+            String selectedDate = selectedDisplay.substring(0, 10);
             
             for (int i = 0; i < tableModel.getRowCount(); i++) {
                 String rId = tableModel.getValueAt(i, 0).toString();
@@ -274,6 +297,7 @@ public class ManagerDashboard extends JPanel {
                     return;
                 }
             }
+            loadDates.run();
             JOptionPane.showMessageDialog(this, "Meals successfully saved for " + selectedDate + "!");
         });
         

@@ -153,4 +153,30 @@ public class UserDAO {
         }
         return hosts;
     }
+
+    public static List<User> getAllUsers() {
+        List<User> list = new ArrayList<>();
+        String query = "SELECT * FROM users";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                String id = rs.getString("id");
+                String name = rs.getString("name");
+                String role = rs.getString("role");
+                String contact = rs.getString("contact");
+                String password = rs.getString("password");
+                if ("MANAGER".equalsIgnoreCase(role)) {
+                    list.add(new Manager(id, name, contact, password));
+                } else if ("GUEST".equalsIgnoreCase(role)) {
+                    list.add(new com.messutility.models.users.Guest(id, name, contact, password));
+                } else {
+                    list.add(new com.messutility.models.users.Resident(id, name, contact, password));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
 }

@@ -105,4 +105,19 @@ public class MealDAO {
         }
         return map;
     }
+
+    public static java.util.Map<String, Integer> getDailyMealTotals() {
+        java.util.Map<String, Integer> totals = new java.util.HashMap<>();
+        String query = "SELECT log_date, SUM(breakfast + lunch + dinner) AS total FROM meal_logs GROUP BY log_date";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                totals.put(rs.getString("log_date"), rs.getInt("total"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return totals;
+    }
 }
