@@ -48,6 +48,16 @@ public class ManagerDashboard extends JPanel {
         JScrollPane scrollPane = new JScrollPane(table);
         panel.add(scrollPane, BorderLayout.CENTER);
 
+        Runnable loadData = () -> {
+            model.setRowCount(0);
+            for (Resident r : UserDAO.getAllResidents()) {
+                model.addRow(new Object[]{r.getId(), r.getName(), "RESIDENT", r.getContact()});
+            }
+        };
+        
+        // Initial load
+        loadData.run();
+
         // Buttons
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton addResBtn = new JButton("Add New Resident");
@@ -61,13 +71,13 @@ public class ManagerDashboard extends JPanel {
                 String id = "R_" + UUID.randomUUID().toString().substring(0, 5);
                 Resident r = new Resident(id, name, "N/A", "password123");
                 UserDAO.addUser(r, "RESIDENT");
-                model.addRow(new Object[]{id, name, "RESIDENT", "N/A"});
+                loadData.run();
                 JOptionPane.showMessageDialog(this, "Resident added! Default password is 'password123'");
             }
         });
 
         JButton refreshBtn = new JButton("Refresh List");
-        // TODO: Load from DB in next iteration
+        refreshBtn.addActionListener(e -> loadData.run());
         
         btnPanel.add(refreshBtn);
         btnPanel.add(addResBtn);
@@ -196,32 +206,45 @@ public class ManagerDashboard extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
+        class ResidentItem {
+            String id;
+            String name;
+            ResidentItem(String id, String name) { this.id = id; this.name = name; }
+            @Override public String toString() { return name; }
+        }
+
         // Form Panel for Adding Expense
-        JPanel formPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
+        JPanel formPanel = new JPanel(new BorderLayout());
         formPanel.setBorder(BorderFactory.createTitledBorder("Add New Expense"));
+        
+        JPanel fieldsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
         
         JComboBox<String> typeBox = new JComboBox<>(new String[]{"MEAL", "UTILITY"});
         JTextField amountField = new JTextField(5);
         JTextField descField = new JTextField(10);
         
-        JComboBox<String> residentBox = new JComboBox<>();
-        residentBox.addItem("None (Manager Paid)");
+        JComboBox<ResidentItem> residentBox = new JComboBox<>();
+        residentBox.addItem(new ResidentItem(null, "None (Manager Paid)"));
         for (Resident r : UserDAO.getAllResidents()) {
-            residentBox.addItem(r.getId() + " - " + r.getName());
+            residentBox.addItem(new ResidentItem(r.getId(), r.getName()));
         }
 
         // Dynamically refresh the dropdown list when clicked
         residentBox.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
             @Override
             public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) {
-                Object selected = residentBox.getSelectedItem();
+                ResidentItem selected = (ResidentItem) residentBox.getSelectedItem();
                 residentBox.removeAllItems();
-                residentBox.addItem("None (Manager Paid)");
+                residentBox.addItem(new ResidentItem(null, "None (Manager Paid)"));
                 for (Resident r : UserDAO.getAllResidents()) {
-                    residentBox.addItem(r.getId() + " - " + r.getName());
+                    ResidentItem item = new ResidentItem(r.getId(), r.getName());
+                    residentBox.addItem(item);
+                    if (selected != null && selected.id != null && selected.id.equals(r.getId())) {
+                        residentBox.setSelectedItem(item);
+                    }
                 }
-                if (selected != null) {
-                    residentBox.setSelectedItem(selected);
+                if (selected != null && selected.id == null) {
+                    residentBox.setSelectedIndex(0);
                 }
             }
             @Override
@@ -230,19 +253,23 @@ public class ManagerDashboard extends JPanel {
             public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) {}
         });
 
-        formPanel.add(new JLabel("Type:"));
-        formPanel.add(typeBox);
-        formPanel.add(new JLabel("Amount:"));
-        formPanel.add(amountField);
-        formPanel.add(new JLabel("Desc:"));
-        formPanel.add(descField);
-        formPanel.add(new JLabel("Paid By:"));
-        formPanel.add(residentBox);
+        fieldsPanel.add(new JLabel("Type:"));
+        fieldsPanel.add(typeBox);
+        fieldsPanel.add(new JLabel("Amount:"));
+        fieldsPanel.add(amountField);
+        fieldsPanel.add(new JLabel("Desc:"));
+        fieldsPanel.add(descField);
+        fieldsPanel.add(new JLabel("Paid By:"));
+        fieldsPanel.add(residentBox);
 
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 10));
         JButton addBtn = new JButton("Add Expense");
         addBtn.setBackground(new Color(230, 126, 34));
         addBtn.setForeground(Color.WHITE);
-        formPanel.add(addBtn);
+        actionPanel.add(addBtn);
+
+        formPanel.add(fieldsPanel, BorderLayout.CENTER);
+        formPanel.add(actionPanel, BorderLayout.SOUTH);
 
         // Center panel for displaying bills
         JTextArea billsArea = new JTextArea();
@@ -258,10 +285,9 @@ public class ManagerDashboard extends JPanel {
                 String type = (String) typeBox.getSelectedItem();
                 
                 Resident paidBy = null;
-                if (residentBox.getSelectedIndex() > 0) {
-                    String selected = (String) residentBox.getSelectedItem();
-                    String resId = selected.split(" - ")[0];
-                    paidBy = UserDAO.getResidentById(resId);
+                ResidentItem selectedItem = (ResidentItem) residentBox.getSelectedItem();
+                if (selectedItem != null && selectedItem.id != null) {
+                    paidBy = UserDAO.getResidentById(selectedItem.id);
                 }
 
                 com.messutility.models.expenses.Expense exp;
