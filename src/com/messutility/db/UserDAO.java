@@ -95,4 +95,20 @@ public class UserDAO {
         }
         return list;
     }
+
+    public static Resident getResidentById(String id) {
+        String query = "SELECT * FROM users WHERE id = ? AND role = 'RESIDENT'";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return new Resident(rs.getString("id"), rs.getString("name"), rs.getString("contact"), rs.getString("password"));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }

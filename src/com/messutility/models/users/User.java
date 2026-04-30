@@ -21,5 +21,9 @@ public abstract class User {
         return name;
     }
 
+    public String getContact() {
+        return contact;
+    }
+
     // Abstract methods can be added as needed
 }

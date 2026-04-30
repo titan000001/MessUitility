@@ -5,10 +5,14 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 
 public class DatabaseManager {
-    private static final String URL = "jdbc:sqlite:mess_utility.db";
+    private static String currentDbUrl = "jdbc:sqlite:default_mess.db";
+
+    public static void setDatabase(String dbName) {
+        currentDbUrl = "jdbc:sqlite:" + dbName + ".db";
+    }
 
     public static Connection getConnection() throws Exception {
-        return DriverManager.getConnection(URL);
+        return DriverManager.getConnection(currentDbUrl);
     }
 
     public static void initializeDatabase() {

@@ -53,9 +53,8 @@ public class LoginScreen extends JPanel {
                 parentFrame.getContentPane().removeAll();
                 if (user instanceof Manager) {
                     parentFrame.add(new ManagerDashboard((Manager) user));
-                } else {
-                    // Resident dashboard placeholder
-                    parentFrame.add(new JLabel("Resident Dashboard Coming Soon..."));
+                } else if (user instanceof com.messutility.models.users.Resident) {
+                    parentFrame.add(new ResidentDashboard((com.messutility.models.users.Resident) user));
                 }
                 parentFrame.revalidate();
                 parentFrame.repaint();

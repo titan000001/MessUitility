@@ -32,6 +32,7 @@ public abstract class Expense {
         return this.status == ExpenseStatus.APPROVED;
     }
 
+    public String getId() { return id; }
     public double getAmount() { return amount; }
     public String getDescription() { return description; }
     public Resident getPaidBy() { return paidBy; }
