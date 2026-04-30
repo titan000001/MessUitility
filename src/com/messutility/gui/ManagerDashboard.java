@@ -105,11 +105,11 @@ public class ManagerDashboard extends JPanel {
         dateLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         rightPanel.add(dateLabel, BorderLayout.NORTH);
 
-        String[] columns = {"Resident Name", "Breakfast", "Lunch", "Dinner"};
+        String[] columns = {"Resident ID", "Resident Name", "Breakfast", "Lunch", "Dinner"};
         DefaultTableModel tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column > 0; // Only B/L/D are editable
+                return column > 1; // Only B/L/D are editable
             }
         };
         
@@ -117,10 +117,14 @@ public class ManagerDashboard extends JPanel {
         table.setRowHeight(30);
         table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+        
+        // Hide the Resident ID column
+        table.getColumnModel().getColumn(0).setMinWidth(0);
+        table.getColumnModel().getColumn(0).setMaxWidth(0);
+        table.getColumnModel().getColumn(0).setWidth(0);
+
         JScrollPane tableScroll = new JScrollPane(table);
         rightPanel.add(tableScroll, BorderLayout.CENTER);
-
-        java.util.List<Resident> allResidents = UserDAO.getAllResidents();
 
         Runnable loadTableForDate = () -> {
             String selectedDate = daysList.getSelectedValue();
@@ -128,14 +132,15 @@ public class ManagerDashboard extends JPanel {
             dateLabel.setText("Editing Meals for: " + selectedDate);
             tableModel.setRowCount(0); // clear
             
+            java.util.List<Resident> currentResidents = UserDAO.getAllResidents();
             java.util.Map<String, com.messutility.models.tracker.MealLog> logs = com.messutility.db.MealDAO.getMealLogsForDate(selectedDate);
             
-            for (Resident r : allResidents) {
+            for (Resident r : currentResidents) {
                 com.messutility.models.tracker.MealLog log = logs.get(r.getId());
                 int b = log != null ? log.getBreakfastCount() : 0;
                 int l = log != null ? log.getLunchCount() : 0;
                 int d = log != null ? log.getDinnerCount() : 0;
-                tableModel.addRow(new Object[]{r.getName(), b, l, d});
+                tableModel.addRow(new Object[]{r.getId(), r.getName(), b, l, d});
             }
         };
 
@@ -162,15 +167,16 @@ public class ManagerDashboard extends JPanel {
             if (selectedDate == null) return;
             
             for (int i = 0; i < tableModel.getRowCount(); i++) {
-                Resident r = allResidents.get(i);
+                String rId = tableModel.getValueAt(i, 0).toString();
+                String rName = tableModel.getValueAt(i, 1).toString();
                 try {
-                    int b = Integer.parseInt(tableModel.getValueAt(i, 1).toString());
-                    int l = Integer.parseInt(tableModel.getValueAt(i, 2).toString());
-                    int d = Integer.parseInt(tableModel.getValueAt(i, 3).toString());
+                    int b = Integer.parseInt(tableModel.getValueAt(i, 2).toString());
+                    int l = Integer.parseInt(tableModel.getValueAt(i, 3).toString());
+                    int d = Integer.parseInt(tableModel.getValueAt(i, 4).toString());
                     
-                    com.messutility.db.MealDAO.logOrUpdateMeal(r.getId(), selectedDate, b, l, d);
+                    com.messutility.db.MealDAO.logOrUpdateMeal(rId, selectedDate, b, l, d);
                 } catch (NumberFormatException ex) {
-                    JOptionPane.showMessageDialog(this, "Invalid number for " + r.getName());
+                    JOptionPane.showMessageDialog(this, "Invalid number for " + rName);
                     return;
                 }
             }
