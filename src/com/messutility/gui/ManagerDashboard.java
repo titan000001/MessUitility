@@ -80,55 +80,108 @@ public class ManagerDashboard extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        JPanel formPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
-        
-        java.util.List<Resident> residents = UserDAO.getAllResidents();
-        JComboBox<String> residentBox = new JComboBox<>();
-        for (Resident r : residents) {
-            residentBox.addItem(r.getId() + " - " + r.getName());
+        // LEFT PANEL: List of Days
+        DefaultListModel<String> daysModel = new DefaultListModel<>();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.YearMonth yearMonth = java.time.YearMonth.from(today);
+        for (int i = 1; i <= yearMonth.lengthOfMonth(); i++) {
+            daysModel.addElement(yearMonth.atDay(i).toString());
         }
-
-        JTextField dateField = new JTextField(java.time.LocalDate.now().toString(), 10);
-        JSpinner brkSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 10, 1));
-        JSpinner lunSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 10, 1));
-        JSpinner dinSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 10, 1));
-
-        formPanel.add(new JLabel("Resident:"));
-        formPanel.add(residentBox);
-        formPanel.add(new JLabel("Date (YYYY-MM-DD):"));
-        formPanel.add(dateField);
-        formPanel.add(new JLabel("Breakfast:"));
-        formPanel.add(brkSpinner);
-        formPanel.add(new JLabel("Lunch:"));
-        formPanel.add(lunSpinner);
-        formPanel.add(new JLabel("Dinner:"));
-        formPanel.add(dinSpinner);
-
-        JButton saveBtn = new JButton("Save Meal Log");
-        saveBtn.setBackground(new Color(52, 152, 219));
-        saveBtn.setForeground(Color.WHITE);
         
-        saveBtn.addActionListener(e -> {
-            if (residentBox.getSelectedItem() != null) {
-                String selected = (String) residentBox.getSelectedItem();
-                String resId = selected.split(" - ")[0];
-                String date = dateField.getText();
-                int b = (int) brkSpinner.getValue();
-                int l = (int) lunSpinner.getValue();
-                int d = (int) dinSpinner.getValue();
+        JList<String> daysList = new JList<>(daysModel);
+        daysList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        daysList.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        daysList.setSelectedIndex(today.getDayOfMonth() - 1); // select today
+        
+        JScrollPane leftScroll = new JScrollPane(daysList);
+        leftScroll.setPreferredSize(new Dimension(150, 0));
+        leftScroll.setBorder(BorderFactory.createTitledBorder("Days of Month"));
+        
+        panel.add(leftScroll, BorderLayout.WEST);
 
-                com.messutility.db.MealDAO.logOrUpdateMeal(resId, date, b, l, d);
-                JOptionPane.showMessageDialog(this, "Meal logged successfully for " + date);
+        // RIGHT PANEL: Table of Residents
+        JPanel rightPanel = new JPanel(new BorderLayout(10, 10));
+        JLabel dateLabel = new JLabel("Editing Meals for: " + daysList.getSelectedValue());
+        dateLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        rightPanel.add(dateLabel, BorderLayout.NORTH);
+
+        String[] columns = {"Resident Name", "Breakfast", "Lunch", "Dinner"};
+        DefaultTableModel tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column > 0; // Only B/L/D are editable
+            }
+        };
+        
+        JTable table = new JTable(tableModel);
+        table.setRowHeight(30);
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+        JScrollPane tableScroll = new JScrollPane(table);
+        rightPanel.add(tableScroll, BorderLayout.CENTER);
+
+        java.util.List<Resident> allResidents = UserDAO.getAllResidents();
+
+        Runnable loadTableForDate = () -> {
+            String selectedDate = daysList.getSelectedValue();
+            if (selectedDate == null) return;
+            dateLabel.setText("Editing Meals for: " + selectedDate);
+            tableModel.setRowCount(0); // clear
+            
+            java.util.Map<String, com.messutility.models.tracker.MealLog> logs = com.messutility.db.MealDAO.getMealLogsForDate(selectedDate);
+            
+            for (Resident r : allResidents) {
+                com.messutility.models.tracker.MealLog log = logs.get(r.getId());
+                int b = log != null ? log.getBreakfastCount() : 0;
+                int l = log != null ? log.getLunchCount() : 0;
+                int d = log != null ? log.getDinnerCount() : 0;
+                tableModel.addRow(new Object[]{r.getName(), b, l, d});
+            }
+        };
+
+        daysList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                loadTableForDate.run();
             }
         });
 
-        formPanel.add(saveBtn);
-        panel.add(formPanel, BorderLayout.NORTH);
+        // Initialize table
+        loadTableForDate.run();
 
-        // Placeholder for a table to show the daily logs
-        JLabel infoLabel = new JLabel("Meal records saved to SQLite 'meal_logs' table.", SwingConstants.CENTER);
-        infoLabel.setFont(new Font("Segoe UI", Font.ITALIC, 14));
-        panel.add(infoLabel, BorderLayout.CENTER);
+        // SAVE BUTTON
+        JButton saveBtn = new JButton("Save Meals for Selected Day");
+        saveBtn.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        saveBtn.setBackground(new Color(46, 204, 113));
+        saveBtn.setForeground(Color.WHITE);
+        
+        saveBtn.addActionListener(e -> {
+            if (table.isEditing()) {
+                table.getCellEditor().stopCellEditing();
+            }
+            String selectedDate = daysList.getSelectedValue();
+            if (selectedDate == null) return;
+            
+            for (int i = 0; i < tableModel.getRowCount(); i++) {
+                Resident r = allResidents.get(i);
+                try {
+                    int b = Integer.parseInt(tableModel.getValueAt(i, 1).toString());
+                    int l = Integer.parseInt(tableModel.getValueAt(i, 2).toString());
+                    int d = Integer.parseInt(tableModel.getValueAt(i, 3).toString());
+                    
+                    com.messutility.db.MealDAO.logOrUpdateMeal(r.getId(), selectedDate, b, l, d);
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(this, "Invalid number for " + r.getName());
+                    return;
+                }
+            }
+            JOptionPane.showMessageDialog(this, "Meals successfully saved for " + selectedDate + "!");
+        });
+        
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(saveBtn);
+        rightPanel.add(btnPanel, BorderLayout.SOUTH);
+
+        panel.add(rightPanel, BorderLayout.CENTER);
 
         return panel;
     }

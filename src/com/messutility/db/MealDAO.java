@@ -75,4 +75,34 @@ public class MealDAO {
         }
         return logs;
     }
+
+    public static java.util.Map<String, com.messutility.models.tracker.MealLog> getMealLogsForDate(String date) {
+        java.util.Map<String, com.messutility.models.tracker.MealLog> map = new java.util.HashMap<>();
+        String query = "SELECT * FROM meal_logs WHERE log_date = ?";
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setString(1, date);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    String resId = rs.getString("resident_id");
+                    int b = rs.getInt("breakfast");
+                    int l = rs.getInt("lunch");
+                    int d = rs.getInt("dinner");
+
+                    com.messutility.models.users.Resident resident = UserDAO.getResidentById(resId);
+                    java.util.Date parsedDate = sdf.parse(date);
+
+                    if (resident != null) {
+                        map.put(resId, new com.messutility.models.tracker.MealLog(resident, parsedDate, b, l, d));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return map;
+    }
 }
