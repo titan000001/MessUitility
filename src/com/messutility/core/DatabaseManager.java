@@ -54,6 +54,14 @@ public class DatabaseManager {
                     "paid_by TEXT, " +
                     "due_date TEXT, " +
                     "FOREIGN KEY(paid_by) REFERENCES users(id))");
+
+            // Create Guest Hosts Table
+            stmt.execute("CREATE TABLE IF NOT EXISTS guest_hosts (" +
+                    "guest_id TEXT, " +
+                    "resident_id TEXT, " +
+                    "PRIMARY KEY(guest_id, resident_id), " +
+                    "FOREIGN KEY(guest_id) REFERENCES users(id), " +
+                    "FOREIGN KEY(resident_id) REFERENCES users(id))");
                     
             System.out.println("SQLite Database Initialized!");
         } catch (Exception e) {

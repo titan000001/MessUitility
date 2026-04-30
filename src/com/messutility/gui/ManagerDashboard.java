@@ -39,7 +39,12 @@ public class ManagerDashboard extends JPanel {
 
         // Table
         String[] columns = {"ID", "Name", "Role", "Contact"};
-        DefaultTableModel model = new DefaultTableModel(columns, 0);
+        DefaultTableModel model = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // Make the table read-only
+            }
+        };
         JTable table = new JTable(model);
         table.setRowHeight(30);
         table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
@@ -51,7 +56,9 @@ public class ManagerDashboard extends JPanel {
         Runnable loadData = () -> {
             model.setRowCount(0);
             for (Resident r : UserDAO.getAllResidents()) {
-                model.addRow(new Object[]{r.getId(), r.getName(), "RESIDENT", r.getContact()});
+                String role = r.getId().startsWith("G_") ? "GUEST" : "RESIDENT";
+                if (r.getId().startsWith("R_admin")) role = "ADMIN RESIDENT";
+                model.addRow(new Object[]{r.getId(), r.getName(), role, r.getContact()});
             }
         };
         
@@ -60,11 +67,45 @@ public class ManagerDashboard extends JPanel {
 
         // Buttons
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        JButton addGuestBtn = new JButton("Register Guest");
+        addGuestBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        addGuestBtn.setBackground(new Color(155, 89, 182));
+        addGuestBtn.setForeground(Color.WHITE);
+        addGuestBtn.addActionListener(e -> {
+            String name = JOptionPane.showInputDialog(this, "Enter Guest Name:");
+            if (name != null && !name.trim().isEmpty()) {
+                String hostId = JOptionPane.showInputDialog(this, "Enter the Host's Resident ID (e.g. R_1a2b3):");
+                if (hostId != null && !hostId.trim().isEmpty()) {
+                    String id = "G_" + UUID.randomUUID().toString().substring(0, 5);
+                    Resident r = new Resident(id, name, "N/A", "guestpass");
+                    UserDAO.addUser(r, "GUEST");
+                    UserDAO.linkGuestToHost(id, hostId);
+                    loadData.run();
+                    JOptionPane.showMessageDialog(this, "Guest added and linked to " + hostId + "!");
+                }
+            }
+        });
+
+        JButton linkGuestBtn = new JButton("Link Guest to Host");
+        linkGuestBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        linkGuestBtn.setBackground(new Color(41, 128, 185));
+        linkGuestBtn.setForeground(Color.WHITE);
+        linkGuestBtn.addActionListener(e -> {
+            String guestId = JOptionPane.showInputDialog(this, "Enter Guest ID (e.g. G_1a2b3):");
+            if (guestId != null && guestId.startsWith("G_")) {
+                String hostId = JOptionPane.showInputDialog(this, "Enter the Co-Host's Resident ID:");
+                if (hostId != null && hostId.startsWith("R_")) {
+                    UserDAO.linkGuestToHost(guestId, hostId);
+                    JOptionPane.showMessageDialog(this, hostId + " is now a co-host for " + guestId);
+                }
+            }
+        });
+
         JButton addResBtn = new JButton("Add New Resident");
         addResBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
         addResBtn.setBackground(new Color(46, 204, 113));
         addResBtn.setForeground(Color.WHITE);
-        
         addResBtn.addActionListener(e -> {
             String name = JOptionPane.showInputDialog(this, "Enter Resident Name:");
             if (name != null && !name.trim().isEmpty()) {
@@ -80,6 +121,8 @@ public class ManagerDashboard extends JPanel {
         refreshBtn.addActionListener(e -> loadData.run());
         
         btnPanel.add(refreshBtn);
+        btnPanel.add(addGuestBtn);
+        btnPanel.add(linkGuestBtn);
         btnPanel.add(addResBtn);
         panel.add(btnPanel, BorderLayout.SOUTH);
 
@@ -203,8 +246,14 @@ public class ManagerDashboard extends JPanel {
     }
 
     private JPanel createExpensesTab() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JTabbedPane innerTabs = new JTabbedPane();
+        innerTabs.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        
+        // --- TAB 1: EXPENSE LOG ---
+        JPanel expenseLogTab = new JPanel(new BorderLayout(10, 10));
 
         class ResidentItem {
             String id;
@@ -270,13 +319,48 @@ public class ManagerDashboard extends JPanel {
 
         formPanel.add(fieldsPanel, BorderLayout.CENTER);
         formPanel.add(actionPanel, BorderLayout.SOUTH);
+        
+        expenseLogTab.add(formPanel, BorderLayout.NORTH);
 
-        // Center panel for displaying bills
-        JTextArea billsArea = new JTextArea();
-        billsArea.setEditable(false);
-        billsArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
-        JScrollPane scrollPane = new JScrollPane(billsArea);
-        scrollPane.setBorder(BorderFactory.createTitledBorder("Generated Monthly Bills"));
+        // Expense Table
+        String[] columns = {"ID", "Date", "Type", "Amount", "Description", "Paid By"};
+        DefaultTableModel expenseModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        JTable expenseTable = new JTable(expenseModel);
+        expenseTable.setRowHeight(30);
+        expenseTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        expenseTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+        
+        // Hide Expense ID column
+        expenseTable.getColumnModel().getColumn(0).setMinWidth(0);
+        expenseTable.getColumnModel().getColumn(0).setMaxWidth(0);
+        expenseTable.getColumnModel().getColumn(0).setWidth(0);
+        
+        JScrollPane expenseScroll = new JScrollPane(expenseTable);
+        expenseScroll.setBorder(BorderFactory.createTitledBorder("All Logged Expenses"));
+        expenseLogTab.add(expenseScroll, BorderLayout.CENTER);
+        
+        Runnable loadExpenses = () -> {
+            expenseModel.setRowCount(0);
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+            for (com.messutility.models.expenses.Expense exp : com.messutility.db.ExpenseDAO.getAllExpenses()) {
+                String paidByName = exp.getPaidBy() != null ? exp.getPaidBy().getName() : "Manager";
+                String typeStr = (exp instanceof com.messutility.models.expenses.UtilityBill) ? "UTILITY" : "MEAL";
+                expenseModel.addRow(new Object[]{
+                    exp.getId(), 
+                    exp.getDueDate() != null ? sdf.format(exp.getDueDate()) : "N/A", 
+                    typeStr, 
+                    "$" + String.format("%.2f", exp.getAmount()), 
+                    exp.getDescription(), 
+                    paidByName
+                });
+            }
+        };
+        loadExpenses.run();
 
         addBtn.addActionListener(e -> {
             try {
@@ -302,12 +386,24 @@ public class ManagerDashboard extends JPanel {
                 JOptionPane.showMessageDialog(this, "Expense Added!");
                 amountField.setText("");
                 descField.setText("");
+                
+                loadExpenses.run(); // Refresh list
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Invalid input. Amount must be a number.");
             }
         });
+        
+        innerTabs.addTab("Expense Log", expenseLogTab);
 
-        // Bottom panel for generating bills
+        // --- TAB 2: MONTHLY SETTLEMENT ---
+        JPanel settlementTab = new JPanel(new BorderLayout(10, 10));
+        
+        JTextArea billsArea = new JTextArea();
+        billsArea.setEditable(false);
+        billsArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        JScrollPane scrollPane = new JScrollPane(billsArea);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Generated Monthly Bills"));
+
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
         JButton generateBtn = new JButton("Generate Month-End Bills");
         generateBtn.setFont(new Font("Segoe UI", Font.BOLD, 16));
@@ -365,10 +461,13 @@ public class ManagerDashboard extends JPanel {
             }
         });
 
-        panel.add(formPanel, BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
-        panel.add(bottomPanel, BorderLayout.SOUTH);
+        settlementTab.add(scrollPane, BorderLayout.CENTER);
+        settlementTab.add(bottomPanel, BorderLayout.SOUTH);
 
-        return panel;
+        innerTabs.addTab("Monthly Settlement", settlementTab);
+        
+        mainPanel.add(innerTabs, BorderLayout.CENTER);
+
+        return mainPanel;
     }
 }

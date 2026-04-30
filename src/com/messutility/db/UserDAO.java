@@ -83,7 +83,7 @@ public class UserDAO {
 
     public static List<Resident> getAllResidents() {
         List<Resident> list = new ArrayList<>();
-        String query = "SELECT * FROM users WHERE role = 'RESIDENT'";
+        String query = "SELECT * FROM users WHERE role IN ('RESIDENT', 'GUEST')";
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query);
              ResultSet rs = stmt.executeQuery()) {
@@ -97,7 +97,7 @@ public class UserDAO {
     }
 
     public static Resident getResidentById(String id) {
-        String query = "SELECT * FROM users WHERE id = ? AND role = 'RESIDENT'";
+        String query = "SELECT * FROM users WHERE id = ? AND role IN ('RESIDENT', 'GUEST')";
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setString(1, id);
@@ -110,5 +110,34 @@ public class UserDAO {
             e.printStackTrace();
         }
         return null;
+    }
+
+    public static void linkGuestToHost(String guestId, String residentId) {
+        String query = "INSERT OR IGNORE INTO guest_hosts (guest_id, resident_id) VALUES (?, ?)";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, guestId);
+            stmt.setString(2, residentId);
+            stmt.executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static List<String> getGuestHosts(String guestId) {
+        List<String> hosts = new ArrayList<>();
+        String query = "SELECT resident_id FROM guest_hosts WHERE guest_id = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, guestId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    hosts.add(rs.getString("resident_id"));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return hosts;
     }
 }

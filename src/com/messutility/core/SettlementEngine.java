@@ -94,15 +94,57 @@ public class SettlementEngine {
             // but for this month-end calculation, we assume these are fresh numbers or we handle it in memory
             r.addOwed(-r.getTotalOwed()); // Reset to 0
             r.addPaid(-r.getTotalPaid()); // Reset to 0
-            
-            // Add meal costs
+        }
+
+        // Add meal costs
+        for (Resident r : residents) {
             int mealsEaten = residentMealCount.getOrDefault(r.getId(), 0);
-            r.addOwed(mealsEaten * costPerMeal);
+            if (r.getId().startsWith("G_")) {
+                java.util.List<String> hosts = com.messutility.db.UserDAO.getGuestHosts(r.getId());
+                if (!hosts.isEmpty()) {
+                    double splitCost = (mealsEaten * costPerMeal) / hosts.size();
+                    for (String hostId : hosts) {
+                        for (Resident host : residents) {
+                            if (host.getId().equals(hostId)) {
+                                host.addOwed(splitCost);
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    r.addOwed(mealsEaten * costPerMeal);
+                }
+            } else {
+                r.addOwed(mealsEaten * costPerMeal);
+            }
         }
 
         // 5. Apply All Expenses (This handles Utility Bill splitting and credits the payers)
         for (com.messutility.models.expenses.Expense exp : expenses) {
             exp.calculateAndAssignSplit(residents, costPerMeal);
+        }
+
+        // 5.5 Redistribute Guest Utility Expenses to their Hosts
+        for (Resident r : residents) {
+            if (r.getId().startsWith("G_") && r.getTotalOwed() > 0) {
+                // At this point, totalOwed might include utility bills. We already handled meals, 
+                // wait, meals were added to hosts directly.
+                // So whatever is in r's owed is solely from UtilityBills!
+                double guestUtilityDebt = r.getTotalOwed();
+                java.util.List<String> hosts = com.messutility.db.UserDAO.getGuestHosts(r.getId());
+                if (!hosts.isEmpty()) {
+                    double splitUtility = guestUtilityDebt / hosts.size();
+                    for (String hostId : hosts) {
+                        for (Resident host : residents) {
+                            if (host.getId().equals(hostId)) {
+                                host.addOwed(splitUtility);
+                                break;
+                            }
+                        }
+                    }
+                    r.addOwed(-guestUtilityDebt); // Clear the guest's debt
+                }
+            }
         }
 
         // 6. Generate the Monthly Bills
