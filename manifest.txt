@@ -1,0 +1,2 @@
+Main-Class: com.messutility.Main
+Class-Path: flatlaf.jar sqlite-jdbc.jar slf4j-api.jar slf4j-simple.jar
