@@ -81,6 +81,19 @@ public class UserDAO {
         }
     }
 
+    public static void updateUser(String id, String name, String contact) {
+        String query = "UPDATE users SET name = ?, contact = ? WHERE id = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, name);
+            stmt.setString(2, contact);
+            stmt.setString(3, id);
+            stmt.executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public static List<Resident> getAllResidents() {
         List<Resident> list = new ArrayList<>();
         String query = "SELECT * FROM users WHERE role IN ('RESIDENT', 'GUEST')";

@@ -46,11 +46,21 @@ public class ManagerDashboard extends JPanel {
             }
         };
         JTable table = new JTable(model);
-        table.setRowHeight(30);
+        table.setRowHeight(35);
         table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 15));
+        table.getTableHeader().setBackground(new Color(240, 242, 245));
+        table.setShowVerticalLines(false);
+        table.setShowHorizontalLines(true);
+        table.setGridColor(new Color(220, 225, 230));
+        table.setSelectionBackground(new Color(41, 128, 185));
+        table.setSelectionForeground(Color.WHITE);
+        table.setFocusable(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
 
         JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.getViewport().setBackground(Color.WHITE);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
         panel.add(scrollPane, BorderLayout.CENTER);
 
         Runnable loadData = () -> {
@@ -66,7 +76,37 @@ public class ManagerDashboard extends JPanel {
         loadData.run();
 
         // Buttons
-        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+
+        JButton editBtn = new JButton("Edit Member Info");
+        editBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        editBtn.setBackground(new Color(243, 156, 18)); // Orange color for Edit
+        editBtn.setForeground(Color.WHITE);
+        editBtn.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a member from the table first!");
+                return;
+            }
+            String id = (String) model.getValueAt(row, 0);
+            String currentName = (String) model.getValueAt(row, 1);
+            String currentContact = (String) model.getValueAt(row, 3);
+            
+            JPanel editPanel = new JPanel(new GridLayout(2, 2, 10, 10));
+            JTextField nameField = new JTextField(currentName);
+            JTextField contactField = new JTextField(currentContact);
+            editPanel.add(new JLabel("Name:"));
+            editPanel.add(nameField);
+            editPanel.add(new JLabel("Contact:"));
+            editPanel.add(contactField);
+            
+            int result = JOptionPane.showConfirmDialog(this, editPanel, "Edit Member: " + id, JOptionPane.OK_CANCEL_OPTION);
+            if (result == JOptionPane.OK_OPTION) {
+                UserDAO.updateUser(id, nameField.getText(), contactField.getText());
+                loadData.run();
+                JOptionPane.showMessageDialog(this, "Info updated successfully!");
+            }
+        });
 
         JButton addGuestBtn = new JButton("Register Guest");
         addGuestBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
@@ -89,7 +129,7 @@ public class ManagerDashboard extends JPanel {
 
         JButton linkGuestBtn = new JButton("Link Guest to Host");
         linkGuestBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        linkGuestBtn.setBackground(new Color(41, 128, 185));
+        linkGuestBtn.setBackground(new Color(52, 152, 219));
         linkGuestBtn.setForeground(Color.WHITE);
         linkGuestBtn.addActionListener(e -> {
             String guestId = JOptionPane.showInputDialog(this, "Enter Guest ID (e.g. G_1a2b3):");
@@ -121,6 +161,7 @@ public class ManagerDashboard extends JPanel {
         refreshBtn.addActionListener(e -> loadData.run());
         
         btnPanel.add(refreshBtn);
+        btnPanel.add(editBtn);
         btnPanel.add(addGuestBtn);
         btnPanel.add(linkGuestBtn);
         btnPanel.add(addResBtn);
