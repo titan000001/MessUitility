@@ -25,5 +25,9 @@ public abstract class User {
         return contact;
     }
 
+    public String getPassword() {
+        return password;
+    }
+
     // Abstract methods can be added as needed
 }

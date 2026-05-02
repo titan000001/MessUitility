@@ -74,7 +74,7 @@ public class UserDAO {
             stmt.setString(2, user.getName());
             stmt.setString(3, role);
             stmt.setString(4, "N/A");
-            stmt.setString(5, "password123"); // default password
+            stmt.setString(5, user.getPassword() != null ? user.getPassword() : "password123");
             stmt.executeUpdate();
         } catch (Exception e) {
             e.printStackTrace();
