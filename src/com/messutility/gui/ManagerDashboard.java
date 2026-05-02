@@ -26,6 +26,7 @@ public class ManagerDashboard extends JPanel {
         JTabbedPane tabbedPane = new JTabbedPane();
         tabbedPane.setFont(new Font("Segoe UI", Font.PLAIN, 16));
 
+        tabbedPane.addTab("Dashboard", createDashboardTab());
         tabbedPane.addTab("Residents", createResidentsTab());
         tabbedPane.addTab("Meal Tracker", createMealTrackerTab());
         tabbedPane.addTab("Expenses & Billing", createExpensesTab());
@@ -534,5 +535,290 @@ public class ManagerDashboard extends JPanel {
         mainPanel.add(innerTabs, BorderLayout.CENTER);
 
         return mainPanel;
+    }
+
+    private JPanel createDashboardTab() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        // 1. The Header & Quick Info
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        
+        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JLabel clockLabel = new JLabel();
+        clockLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        
+        javax.swing.Timer timer = new javax.swing.Timer(1000, e -> {
+            clockLabel.setText(java.text.DateFormat.getDateTimeInstance().format(new java.util.Date()));
+        });
+        timer.start();
+        
+        JButton refreshBtn = new JButton("↻ Refresh");
+        refreshBtn.addActionListener(e -> {
+            Container parent = panel.getParent();
+            if (parent instanceof JTabbedPane) {
+                JTabbedPane tabs = (JTabbedPane) parent;
+                int idx = tabs.indexOfComponent(panel);
+                if (idx != -1) {
+                    tabs.setComponentAt(idx, createDashboardTab());
+                }
+            }
+        });
+        
+        topBar.add(clockLabel);
+        topBar.add(Box.createHorizontalStrut(15));
+        topBar.add(refreshBtn);
+        headerPanel.add(topBar, BorderLayout.EAST);
+        
+        JPanel cardsPanel = new JPanel(new GridLayout(1, 3, 15, 15));
+        cardsPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 20, 0));
+        
+        // Data gathering
+        java.util.List<Resident> residents = UserDAO.getAllResidents();
+        java.util.List<com.messutility.models.expenses.Expense> expenses = com.messutility.db.ExpenseDAO.getAllExpenses();
+        java.util.List<com.messutility.models.tracker.MealLog> mealLogs = com.messutility.db.MealDAO.getAllMealLogs();
+        
+        // This calculates debts/credits and puts them into the resident objects
+        com.messutility.core.SettlementEngine.generateMonthlyBills(expenses, mealLogs, residents);
+        
+        double totalExpenses = 0;
+        double totalGrocery = 0;
+        double totalUtility = 0;
+        for (com.messutility.models.expenses.Expense exp : expenses) {
+            if (exp.isApproved()) {
+                totalExpenses += exp.getAmount();
+                if (exp instanceof com.messutility.models.expenses.MealExpense) {
+                    totalGrocery += exp.getAmount();
+                } else {
+                    totalUtility += exp.getAmount();
+                }
+            }
+        }
+        
+        int totalMeals = 0;
+        java.util.Map<String, Integer> pieData = new java.util.HashMap<>();
+        for (com.messutility.models.tracker.MealLog log : mealLogs) {
+            int dailyMeals = log.getTotalMealsForDay();
+            totalMeals += dailyMeals;
+            String name = log.getResident().getName();
+            pieData.put(name, pieData.getOrDefault(name, 0) + dailyMeals);
+        }
+        
+        double mealRate = totalMeals > 0 ? totalGrocery / totalMeals : 0;
+        double utilityPerPerson = residents.size() > 0 ? totalUtility / residents.size() : 0;
+
+        JPanel card1 = createSummaryCard("Total Expenses", "$" + String.format("%.2f", totalExpenses), new Color(41, 128, 185));
+        JPanel card2 = createSummaryCard("Total Meals Logged", String.valueOf(totalMeals), new Color(39, 174, 96));
+        JPanel card3 = createSummaryCard("Current Meal Rate", "$" + String.format("%.2f", mealRate), new Color(142, 68, 173));
+        
+        cardsPanel.add(card1);
+        cardsPanel.add(card2);
+        cardsPanel.add(card3);
+        
+        headerPanel.add(cardsPanel, BorderLayout.SOUTH);
+        panel.add(headerPanel, BorderLayout.NORTH);
+        
+        // Center Split
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        splitPane.setResizeWeight(0.5);
+        splitPane.setBorder(null);
+
+        // LEFT SIDE: Visuals & Daily
+        JPanel leftPanel = new JPanel(new BorderLayout(10, 10));
+        
+        // Pie Chart
+        JPanel pieChartPanel = createPieChartPanel(pieData, totalMeals);
+        leftPanel.add(pieChartPanel, BorderLayout.CENTER);
+        
+        // Who's Eating Today Snapshot
+        JPanel todayPanel = new JPanel(new BorderLayout());
+        todayPanel.setBorder(BorderFactory.createTitledBorder("Who's Eating Today?"));
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.util.Map<String, com.messutility.models.tracker.MealLog> todayLogs = com.messutility.db.MealDAO.getMealLogsForDate(today.toString());
+        
+        int bCount = 0, lCount = 0, dCount = 0;
+        for (com.messutility.models.tracker.MealLog log : todayLogs.values()) {
+            bCount += log.getBreakfastCount();
+            lCount += log.getLunchCount();
+            dCount += log.getDinnerCount();
+        }
+        JLabel todayLabel = new JLabel(String.format("<html><b>Breakfast:</b> %d members &nbsp;&nbsp;&nbsp; <b>Lunch:</b> %d members &nbsp;&nbsp;&nbsp; <b>Dinner:</b> %d members</html>", bCount, lCount, dCount));
+        todayLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        todayLabel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        todayPanel.add(todayLabel, BorderLayout.CENTER);
+        
+        leftPanel.add(todayPanel, BorderLayout.SOUTH);
+        splitPane.setLeftComponent(leftPanel);
+
+        // RIGHT SIDE: Finances & Accumulative Balance Table
+        JPanel rightPanel = new JPanel(new BorderLayout(10, 10));
+        
+        JPanel financeInfoPanel = new JPanel(new GridLayout(2, 1, 5, 5));
+        financeInfoPanel.setBorder(BorderFactory.createTitledBorder("Finance Details"));
+        JLabel utilLabel = new JLabel("Utility Cost Per Person: $" + String.format("%.2f", utilityPerPerson));
+        utilLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        financeInfoPanel.add(utilLabel);
+        
+        // Low Balance Alerts
+        StringBuilder alerts = new StringBuilder("<html><font color='red'><b>Low Balance Alerts:</b></font> ");
+        boolean hasAlerts = false;
+        for (Resident r : residents) {
+            if (r.getId().startsWith("G_")) continue;
+            if (r.getNetBalance() < -50.0) { // Arbitrary threshold
+                alerts.append(r.getName()).append(" ($-").append(String.format("%.2f", Math.abs(r.getNetBalance()))).append(")  ");
+                hasAlerts = true;
+            }
+        }
+        if (!hasAlerts) alerts.append("<font color='green'>All members are in good standing.</font>");
+        alerts.append("</html>");
+        financeInfoPanel.add(new JLabel(alerts.toString()));
+        
+        rightPanel.add(financeInfoPanel, BorderLayout.NORTH);
+
+        // Accumulative Balance Table
+        String[] columns = {"Member Name", "Total Paid", "Cost (Meals+Util)", "Net Balance"};
+        javax.swing.table.DefaultTableModel tableModel = new javax.swing.table.DefaultTableModel(columns, 0) {
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+        for (Resident r : residents) {
+            if (r.getId().startsWith("G_")) continue;
+            double paid = r.getTotalPaid();
+            double owed = r.getTotalOwed();
+            double net = r.getNetBalance();
+            tableModel.addRow(new Object[]{
+                r.getName(),
+                "$" + String.format("%.2f", paid),
+                "$" + String.format("%.2f", owed),
+                net
+            });
+        }
+        JTable balanceTable = new JTable(tableModel);
+        balanceTable.setRowHeight(30);
+        balanceTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        
+        balanceTable.setDefaultRenderer(Object.class, new javax.swing.table.DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                if (column == 3) {
+                    double net = (Double) value;
+                    if (net >= 0) {
+                        c.setForeground(new Color(39, 174, 96)); // Green
+                        setText("+$" + String.format("%.2f", net));
+                    } else {
+                        c.setForeground(Color.RED);
+                        setText("-$" + String.format("%.2f", Math.abs(net)));
+                    }
+                    setFont(getFont().deriveFont(Font.BOLD));
+                } else {
+                    c.setForeground(Color.BLACK);
+                    setFont(getFont().deriveFont(Font.PLAIN));
+                }
+                return c;
+            }
+        });
+        
+        JScrollPane tableScroll = new JScrollPane(balanceTable);
+        tableScroll.setBorder(BorderFactory.createTitledBorder("Accumulative Balances"));
+        rightPanel.add(tableScroll, BorderLayout.CENTER);
+        
+        // Export to Clipboard
+        JButton copyBtn = new JButton("Copy Summary to Clipboard");
+        copyBtn.setBackground(new Color(52, 152, 219));
+        copyBtn.setForeground(Color.WHITE);
+        copyBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        copyBtn.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            sb.append("*Mess Summary*\n");
+            sb.append("Meal Rate: $").append(String.format("%.2f", mealRate)).append("\n");
+            sb.append("Utility/Person: $").append(String.format("%.2f", utilityPerPerson)).append("\n\n");
+            sb.append("*Balances:*\n");
+            for (Resident r : residents) {
+                if (r.getId().startsWith("G_")) continue;
+                double net = r.getNetBalance();
+                sb.append(r.getName()).append(": ");
+                if (net >= 0) sb.append("Surplus +$").append(String.format("%.2f", net)).append("\n");
+                else sb.append("Deficit -$").append(String.format("%.2f", Math.abs(net))).append("\n");
+            }
+            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new java.awt.datatransfer.StringSelection(sb.toString()), null);
+            JOptionPane.showMessageDialog(panel, "Summary copied to clipboard!");
+        });
+        rightPanel.add(copyBtn, BorderLayout.SOUTH);
+
+        splitPane.setRightComponent(rightPanel);
+        panel.add(splitPane, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    private JPanel createSummaryCard(String title, String value, Color bgColor) {
+        JPanel card = new JPanel(new BorderLayout());
+        card.setBackground(bgColor);
+        card.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        
+        JLabel valueLabel = new JLabel(value);
+        valueLabel.setForeground(Color.WHITE);
+        valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        
+        card.add(titleLabel, BorderLayout.NORTH);
+        card.add(valueLabel, BorderLayout.CENTER);
+        return card;
+    }
+
+    private JPanel createPieChartPanel(java.util.Map<String, Integer> pieData, int totalMeals) {
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (totalMeals == 0) return;
+                
+                Graphics2D g2d = (Graphics2D) g;
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                int width = getWidth();
+                int height = getHeight();
+                int size = Math.min(width, height) - 60; // Make room
+                int x = (width - size) / 2 + 60; // Shift right for legend
+                int y = (height - size) / 2;
+                
+                int startAngle = 0;
+                Color[] colors = {
+                    new Color(231, 76, 60), new Color(46, 204, 113), new Color(52, 152, 219),
+                    new Color(155, 89, 182), new Color(241, 196, 15), new Color(230, 126, 34),
+                    new Color(26, 188, 156)
+                };
+                
+                int colorIdx = 0;
+                int listY = 20;
+                
+                for (java.util.Map.Entry<String, Integer> entry : pieData.entrySet()) {
+                    if (entry.getValue() == 0) continue;
+                    
+                    int arcAngle = (int) Math.round((entry.getValue() * 360.0) / totalMeals);
+                    g2d.setColor(colors[colorIdx % colors.length]);
+                    g2d.fillArc(x, y, size, size, startAngle, arcAngle);
+                    startAngle += arcAngle;
+                    
+                    // Legend
+                    g2d.fillRect(10, listY, 12, 12);
+                    g2d.setColor(Color.BLACK);
+                    g2d.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                    
+                    // Calculate percentage
+                    double pct = (entry.getValue() * 100.0) / totalMeals;
+                    g2d.drawString(String.format("%s (%.1f%%)", entry.getKey(), pct), 28, listY + 11);
+                    listY += 25;
+                    
+                    colorIdx++;
+                }
+            }
+        };
+        panel.setBorder(BorderFactory.createTitledBorder("Member Meal Consumption"));
+        panel.setPreferredSize(new Dimension(350, 300));
+        return panel;
     }
 }

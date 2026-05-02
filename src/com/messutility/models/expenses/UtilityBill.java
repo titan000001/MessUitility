@@ -19,7 +19,12 @@ public class UtilityBill extends Expense {
         }
         
         if (this.paidBy != null) {
-            this.paidBy.addPaid(this.amount);
+            for (Resident r : allResidents) {
+                if (r.getId().equals(this.paidBy.getId())) {
+                    r.addPaid(this.amount);
+                    break;
+                }
+            }
         }
     }
 }
