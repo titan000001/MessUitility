@@ -13,6 +13,12 @@ A robust, Java-based Desktop application designed to completely automate and sim
     *   Dynamically generates the **Cost Per Meal**.
     *   Splits fixed **Utility Bills** (like Wi-Fi, Electricity) evenly among all active residents.
     *   Automatically credits any resident who paid for a shared expense out of their own pocket.
+*   **Real-time Overview Dashboard:**
+    *   **Live Metrics:** "At a Glance" cards displaying total expenses, total logged meals, and the real-time calculated Cost Per Meal.
+    *   **Visual Data:** A built-in pie chart mapping out the exact percentage of meals consumed by each active member.
+    *   **Accumulative Balance Tracking:** Live table tracking how much money each member has deposited vs. the actual cost of their meals and utility cut, instantly calculating their Net Balance (Surplus/Deficit).
+    *   **Low Balance Alerts:** Automatic warning indicators to flag members with a negative balance.
+    *   **1-Click Share:** Instantly format the entire financial breakdown into text and copy it to your clipboard for easy sharing in WhatsApp/Telegram.
 *   **Persistent SQLite Database:** Zero configuration required. The app automatically creates and manages local `.db` files using JDBC.
 *   **Modern Desktop UI:** Built using `FlatLaf` (Flat Dark Look and Feel) for a sleek, responsive, and native Windows experience.
 *   **Native Windows Executable:** Bundled via `jpackage` into a standalone `.exe` so end-users don't need to touch the terminal or install Java.
